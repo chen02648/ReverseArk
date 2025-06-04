@@ -1,0 +1,842 @@
+
+
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D游戏剧情对话系统设计与实作</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Noto+Serif+TC:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #8a4fff;
+            --secondary: #ff6b9d;
+            --accent: #00e5ff;
+            --dark: #1a1a2e;
+            --light: #f5f5f7;
+        }
+        
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: var(--dark);
+            color: var(--light);
+            overflow-x: hidden;
+        }
+        
+        .serif {
+            font-family: 'Noto Serif TC', serif;
+        }
+        
+        .gradient-text {
+            background: linear-gradient(90deg, var(--accent), var(--secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        .gradient-border {
+            position: relative;
+            border: 2px solid transparent;
+            background: linear-gradient(var(--dark), var(--dark)) padding-box,
+                        linear-gradient(90deg, var(--accent), var(--secondary)) border-box;
+        }
+        
+        .nav-item {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .nav-item::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--accent), var(--secondary));
+            transition: width 0.3s ease;
+        }
+        
+        .nav-item:hover::after {
+            width: 100%;
+        }
+        
+        .card {
+            background: rgba(26, 26, 46, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(138, 79, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(138, 79, 255, 0.2);
+        }
+        
+        .pixel-dots {
+            background-image: radial-gradient(rgba(138, 79, 255, 0.2) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        
+        .glow {
+            box-shadow: 0 0 15px rgba(0, 229, 255, 0.5);
+        }
+        
+        .code-block {
+            font-family: monospace;
+            background: rgba(26, 26, 46, 0.9);
+            border-left: 3px solid var(--accent);
+        }
+        
+        /* 動畫效果 */
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+        
+        .float {
+            animation: float 4s ease-in-out infinite;
+        }
+        
+        .float-delay {
+            animation: float 4s ease-in-out 1s infinite;
+        }
+        
+        /* 系統架構圖 SVG 樣式 */
+        .system-node {
+            fill: rgba(26, 26, 46, 0.9);
+            stroke: var(--primary);
+            stroke-width: 2;
+        }
+        
+        .system-text {
+            fill: var(--light);
+            font-size: 12px;
+            text-anchor: middle;
+        }
+        
+        .system-line {
+            stroke: var(--secondary);
+            stroke-width: 2;
+            stroke-dasharray: 5, 5;
+        }
+        
+        /* 系統架構圖容器樣式 */
+        .architecture-container {
+            max-height: 500px;
+            overflow: auto;
+        }
+    </style>
+</head>
+<body>
+    <!-- 導航欄 -->
+    <nav class="fixed top-0 w-full bg-opacity-80 bg-[#1a1a2e] backdrop-blur-md z-50 border-b border-opacity-20 border-[#8a4fff]">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <div class="w-8 h-8 rounded-full bg-gradient-to-r from-[#8a4fff] to-[#ff6b9d] flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" />
+                    </svg>
+                </div>
+                <span class="text-lg font-bold gradient-text">對話系統專題</span>
+            </div>
+            <div class="hidden md:flex space-x-6">
+                <a href="#home" class="nav-item text-sm py-2 px-1 text-gray-200 hover:text-white">首頁</a>
+                <a href="#intro" class="nav-item text-sm py-2 px-1 text-gray-200 hover:text-white">專題介紹</a>
+                <a href="#system" class="nav-item text-sm py-2 px-1 text-gray-200 hover:text-white">系統設計</a>
+                <a href="#result" class="nav-item text-sm py-2 px-1 text-gray-200 hover:text-white">成果總結</a>
+                <a href="#conclusion" class="nav-item text-sm py-2 px-1 text-gray-200 hover:text-white">結論展望</a>
+                <a href="#about" class="nav-item text-sm py-2 px-1 text-gray-200 hover:text-white">關於我</a>
+            </div>
+            <button class="md:hidden text-white">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+            </button>
+        </div>
+    </nav>
+
+    <!-- 首頁/封面 -->
+    <section id="home" class="min-h-screen pt-20 pb-10 flex items-center relative pixel-dots">
+        <div class="absolute top-0 right-0 w-full h-full overflow-hidden z-0">
+            <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" class="absolute top-10 right-10 w-96 h-96 opacity-10">
+                <path fill="#8A4FFF" d="M40.8,-68.3C51.8,-61.2,59.2,-47.8,65.8,-34.1C72.4,-20.4,78.2,-6.5,76.2,6.2C74.2,18.9,64.4,30.3,54.3,39.5C44.2,48.7,33.8,55.6,22.1,60.9C10.3,66.2,-2.8,69.9,-16.1,68.7C-29.4,67.5,-42.9,61.5,-53.4,51.8C-63.9,42.1,-71.5,28.7,-74.3,14.2C-77.1,-0.3,-75.2,-15.9,-68.9,-28.7C-62.6,-41.5,-51.9,-51.5,-39.9,-58C-27.9,-64.5,-14,-67.5,0.6,-68.5C15.1,-69.5,29.8,-75.4,40.8,-68.3Z" transform="translate(100 100)" />
+            </svg>
+            <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" class="absolute bottom-10 left-10 w-64 h-64 opacity-10">
+                <path fill="#FF6B9D" d="M47.7,-73.2C62.2,-67.3,74.5,-54.9,79.7,-40.1C84.9,-25.3,83,-8.1,78.9,7.1C74.8,22.3,68.5,35.5,59.1,46.2C49.7,56.9,37.2,65.1,23.4,70.6C9.6,76.1,-5.5,79,-19.9,76.2C-34.3,73.5,-48,65.2,-58.4,53.8C-68.8,42.4,-75.9,27.9,-78.2,12.5C-80.5,-2.9,-78,-19.2,-70.7,-32.6C-63.4,-46,-51.3,-56.5,-38.1,-62.9C-24.9,-69.3,-10.7,-71.6,3.2,-76.5C17.1,-81.4,33.2,-79.1,47.7,-73.2Z" transform="translate(100 100)" />
+            </svg>
+        </div>
+        
+        <div class="container mx-auto px-4 z-10">
+            <div class="flex flex-col md:flex-row items-center">
+                <div class="md:w-1/2 mb-10 md:mb-0">
+                    <h1 class="text-4xl md:text-5xl font-bold mb-4 serif">
+                        <span class="gradient-text">2D游戏剧情对话系统</span><br>
+                        设计与实作
+                    </h1>
+                    <div class="h-1 w-24 bg-gradient-to-r from-[#8a4fff] to-[#ff6b9d] mb-6"></div>
+                    <div class="mb-8 space-y-3">
+                        <p class="flex items-center">
+                            <span class="w-24 text-gray-400">學生姓名</span>
+                            <span>陳文茜</span>
+                        </p>
+                        <p class="flex items-center">
+                            <span class="w-24 text-gray-400">學號</span>
+                            <span>111010539</span>
+                        </p>
+                        <p class="flex items-center">
+                            <span class="w-24 text-gray-400">指導老師</span>
+                            <span>趙于翔</span>
+                        </p>
+                        <p class="flex items-center">
+                            <span class="w-24 text-gray-400">學校系所</span>
+                            <span>國立金門大學資訊工程學系四年級</span>
+                        </p>
+                        <p class="flex items-center">
+                            <span class="w-24 text-gray-400">學年度</span>
+                            <span>113學年度第二學期</span>
+                        </p>
+                    </div>
+                    <div class="gradient-border p-4 rounded-lg">
+                        <h3 class="text-lg font-medium mb-2 text-[#00e5ff]">專題簡介</h3>
+                        <p class="text-sm leading-relaxed">
+                            本專題旨在設計並實作一套 2D 劇情對話系統，作為劇情導向型遊戲的重要核心模組。透過 Unity 平台進行開發，系統採用資料驅動架構，支援角色對話、旁白展示、選項跳轉、道具呈現、場景轉場等功能，具備良好的模組化與擴充性。
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="md:w-1/2 flex justify-center">
+                    <div class="relative">
+                        <!-- 對話框 SVG 圖示 -->
+                        <svg class="w-80 h-80 float" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <linearGradient id="dialogGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#8a4fff" stop-opacity="0.8" />
+                                    <stop offset="100%" stop-color="#ff6b9d" stop-opacity="0.8" />
+                                </linearGradient>
+                            </defs>
+                            <rect x="20" y="40" width="160" height="100" rx="10" fill="url(#dialogGradient)" />
+                            <polygon points="80,140 100,170 120,140" fill="url(#dialogGradient)" />
+                            <text x="100" y="80" text-anchor="middle" fill="white" font-size="12">對話系統</text>
+                            <text x="100" y="100" text-anchor="middle" fill="white" font-size="10">JSON 資料驅動</text>
+                            <text x="100" y="120" text-anchor="middle" fill="white" font-size="10">Unity 模組化設計</text>
+                            
+                            <!-- 角色圖示 -->
+                            <circle cx="40" cy="30" r="20" fill="#00e5ff" opacity="0.8" />
+                            <circle cx="160" cy="30" r="20" fill="#ff6b9d" opacity="0.8" />
+                            
+                            <!-- 連接線 -->
+                            <line x1="40" y1="50" x2="40" y2="70" stroke="white" stroke-width="2" stroke-dasharray="3,3" />
+                            <line x1="160" y1="50" x2="160" y2="70" stroke="white" stroke-width="2" stroke-dasharray="3,3" />
+                            
+                            <!-- 代碼符號 -->
+                            <text x="30" y="30" font-family="monospace" fill="white" font-size="10">{}</text>
+                            <text x="150" y="30" font-family="monospace" fill="white" font-size="10">{ }</text>
+                        </svg>
+                        
+                        <!-- 裝飾元素 -->
+                        <div class="absolute -top-10 -right-10 w-20 h-20 rounded-full bg-[#00e5ff] opacity-20 float-delay"></div>
+                        <div class="absolute -bottom-5 -left-5 w-16 h-16 rounded-full bg-[#ff6b9d] opacity-20 float"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 專題介紹 -->
+    <section id="intro" class="py-20 relative">
+        <div class="container mx-auto px-4">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl font-bold mb-2 serif">專題介紹</h2>
+                <div class="h-1 w-16 bg-gradient-to-r from-[#8a4fff] to-[#ff6b9d] mx-auto"></div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-10">
+                <div class="card p-6 rounded-lg">
+                    <div class="flex items-center mb-4">
+                        <div class="w-10 h-10 rounded-full bg-[#8a4fff] flex items-center justify-center mr-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold gradient-text">研究背景與動機</h3>
+                    </div>
+                    <p class="text-gray-300 leading-relaxed">
+                        隨著遊戲產業的發展，劇情型遊戲逐漸受到重視，許多成功作品皆以豐富的故事性與角色互動為核心。本人長期對小說創作與互動式敘事有濃厚興趣，也遊玩過多款融合探索與劇情推進的遊戲作品，逐漸萌生了「將故事轉化為可玩內容」的想法。
+                    </p>
+                    <p class="text-gray-300 leading-relaxed mt-4">
+                        然而，相較於成熟的遊戲開發框架，初學者在製作原創遊戲時，往往缺乏一套可重複利用、易於擴充的劇情播放系統。因此，本專題希望結合所學，從系統架構的角度出發，打造一套具模組化、資料驅動特性的 2D 對話系統，作為日後敘事型遊戲開發的核心基礎。
+                    </p>
+                </div>
+                
+                <div class="card p-6 rounded-lg">
+                    <div class="flex items-center mb-4">
+                        <div class="w-10 h-10 rounded-full bg-[#ff6b9d] flex items-center justify-center mr-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold gradient-text">研究目的</h3>
+                    </div>
+                    <p class="text-gray-300 leading-relaxed">
+                        本專題的主要目的是開發一套可支援遊戲內劇情展示的完整對話系統模組，具備以下幾項核心功能：
+                    </p>
+                    <ul class="mt-4 space-y-3">
+                        <li class="flex items-start">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#00e5ff] mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span>支援角色對話、旁白、選項跳轉與道具展示等基本互動需求</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#00e5ff] mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span>採用 JSON 格式作為資料來源，實現劇情撰寫與維護的彈性</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#00e5ff] mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span>建立獨立的 UI 元件控制架構，達成模組化、易維護的系統設計</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#00e5ff] mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span>完整整合啟動畫面、載入場景、過場轉場與角色立繪控制流程</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#00e5ff] mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span>作為未來完整敘事遊戲之核心，便於後續功能拓展與內容填充</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="mt-12 text-center">
+                <p class="text-gray-300 max-w-2xl mx-auto">
+                    透過本專題的實作，不僅能奠定劇情系統的基礎結構，也可作為學習 Unity 架構化開發的實務經驗累積。
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- 系統設計與實作 -->
+    <section id="system" class="py-20 bg-[#151525]">
+        <div class="container mx-auto px-4">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl font-bold mb-2 serif">系統設計與實作</h2>
+                <div class="h-1 w-16 bg-gradient-to-r from-[#8a4fff] to-[#ff6b9d] mx-auto"></div>
+            </div>
+            
+            <!-- 系統架構圖 - 修改後的版本，增加高度並添加垂直滾動條 -->
+            <div class="mb-16">
+                <h3 class="text-xl font-semibold mb-6 text-center gradient-text">系統架構圖</h3>
+                <div class="bg-[#1a1a2e] p-6 rounded-lg shadow-lg architecture-container">
+                    <div style="min-width: 800px; min-height: 500px;">
+                        <svg width="800" height="500" viewBox="0 0 800 500" class="mx-auto">
+                            <!-- 連接線 -->
+                            <line x1="400" y1="60" x2="400" y2="100" class="system-line" />
+                            <line x1="400" y1="160" x2="400" y2="200" class="system-line" />
+                            <line x1="400" y1="260" x2="400" y2="300" class="system-line" />
+                            <line x1="400" y1="300" x2="200" y2="340" class="system-line" />
+                            <line x1="400" y1="300" x2="600" y2="340" class="system-line" />
+                            <line x1="200" y1="340" x2="100" y2="380" class="system-line" />
+                            <line x1="200" y1="340" x2="300" y2="380" class="system-line" />
+                            <line x1="600" y1="340" x2="500" y2="380" class="system-line" />
+                            <line x1="600" y1="340" x2="700" y2="380" class="system-line" />
+                            
+                            <!-- 節點 -->
+                            <rect x="300" y="20" width="200" height="40" rx="5" class="system-node" />
+                            <text x="400" y="45" class="system-text">SplashSceneController</text>
+                            
+                            <rect x="300" y="120" width="200" height="40" rx="5" class="system-node" />
+                            <text x="400" y="145" class="system-text">LoadingSceneController</text>
+                            
+                            <rect x="300" y="220" width="200" height="40" rx="5" class="system-node" />
+                            <text x="400" y="245" class="system-text">DialogueManager</text>
+                            
+                            <rect x="100" y="300" width="200" height="40" rx="5" class="system-node" />
+                            <text x="200" y="325" class="system-text">UIManager</text>
+                            
+                            <rect x="500" y="300" width="200" height="40" rx="5" class="system-node" />
+                            <text x="600" y="325" class="system-text">DialogueUIManager</text>
+                            
+                            <rect x="0" y="380" width="200" height="40" rx="5" class="system-node" />
+                            <text x="100" y="405" class="system-text">TransitionPanelController</text>
+                            
+                            <rect x="200" y="380" width="200" height="40" rx="5" class="system-node" />
+                            <text x="300" y="405" class="system-text">PortraitManager</text>
+                            
+                            <rect x="400" y="380" width="200" height="40" rx="5" class="system-node" />
+                            <text x="500" y="405" class="system-text">DialoguePanelController</text>
+                            
+                            <rect x="600" y="380" width="200" height="40" rx="5" class="system-node" />
+                            <text x="700" y="405" class="system-text">AsidePanelController</text>
+                            
+                            <!-- 額外的說明文字 -->
+                            <rect x="200" y="440" width="400" height="40" rx="5" class="system-node" opacity="0.7" />
+                            <text x="400" y="465" class="system-text">系統核心模組關係圖</text>
+                        </svg>
+                    </div>
+                </div>
+                <p class="text-gray-300 text-sm mt-4 text-center">
+                    本系統採用模組化架構，透過核心控制器（如 DialogueManager）串聯各功能模組，實現劇情播放、畫面切換與 UI 控制的分層管理。
+                </p>
+            </div>
+            
+            <!-- 主要功能模組說明 -->
+            <div class="mb-16">
+                <h3 class="text-xl font-semibold mb-6 text-center gradient-text">主要功能模組說明</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full border-collapse">
+                        <thead>
+                            <tr class="bg-[#8a4fff] bg-opacity-20">
+                                <th class="p-3 text-left border-b border-[#8a4fff] border-opacity-30">模組名稱</th>
+                                <th class="p-3 text-left border-b border-[#8a4fff] border-opacity-30">功能說明</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="hover:bg-[#1a1a2e]">
+                                <td class="p-3 border-b border-[#8a4fff] border-opacity-10 font-mono text-[#00e5ff]">DialogueManager.cs</td>
+                                <td class="p-3 border-b border-[#8a4fff] border-opacity-10">控制整體劇情流程，包括 JSON 載入、逐行播放、觸發轉場與道具展示</td>
+                            </tr>
+                            <tr class="hover:bg-[#1a1a2e]">
+                                <td class="p-3 border-b border-[#8a4fff] border-opacity-10 font-mono text-[#00e5ff]">UIManager.cs</td>
+                                <td class="p-3 border-b border-[#8a4fff] border-opacity-10">管理整體 UI 顯示與濾鏡效果等，為全局控制器</td>
+                            </tr>
+                            <tr class="hover:bg-[#1a1a2e]">
+                                <td class="p-3 border-b border-[#8a4fff] border-opacity-10 font-mono text-[#00e5ff]">DialogueUIManager.cs</td>
+                                <td class="p-3 border-b border-[#8a4fff] border-opacity-10">管理對話專屬 UI，如對話框、旁白框、選項與道具顯示等</td>
+                            </tr>
+                            <tr class="hover:bg-[#1a1a2e]">
+                                <td class="p-3 border-b border-[#8a4fff] border-opacity-10 font-mono text-[#00e5ff]">PortraitManager.cs</td>
+                                <td class="p-3 border-b border-[#8a4fff] border-opacity-10">控制角色立繪的載入、切換、滑入滑出動畫與表情變化</td>
+                            </tr>
+                            <tr class="hover:bg-[#1a1a2e]">
+                                <td class="p-3 border-b border-[#8a4fff] border-opacity-10 font-mono text-[#00e5ff]">TransitionPanelController.cs</td>
+                                <td class="p-3 border-b border-[#8a4fff] border-opacity-10">控制黑幕轉場與文字轉場效果</td>
+                            </tr>
+                            <tr class="hover:bg-[#1a1a2e]">
+                                <td class="p-3 border-b border-[#8a4fff] border-opacity-10 font-mono text-[#00e5ff]">PropsDatabase.cs</td>
+                                <td class="p-3 border-b border-[#8a4fff] border-opacity-10">負責道具 JSON 的解析與管理，支援多類型道具顯示</td>
+                            </tr>
+                            <tr class="hover:bg-[#1a1a2e]">
+                                <td class="p-3 border-b border-[#8a4fff] border-opacity-10 font-mono text-[#00e5ff]">各 UI Controller</td>
+                                <td class="p-3 border-b border-[#8a4fff] border-opacity-10">管理各 UI prefab 的顯示邏輯與動畫，實現高度模組化</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- 使用的技術與工具 -->
+            <div>
+                <h3 class="text-xl font-semibold mb-6 text-center gradient-text">使用的技術與工具</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div class="card p-4 rounded-lg flex items-center">
+                        <div class="w-12 h-12 rounded-lg bg-[#8a4fff] bg-opacity-20 flex items-center justify-center mr-4">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#8a4fff]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h4 class="font-medium text-white">開發引擎</h4>
+                            <p class="text-sm text-gray-300">Unity（URP 模板）</p>
+                        </div>
+                    </div>
+                    
+                    <div class="card p-4 rounded-lg flex items-center">
+                        <div class="w-12 h-12 rounded-lg bg-[#ff6b9d] bg-opacity-20 flex items-center justify-center mr-4">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#ff6b9d]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h4 class="font-medium text-white">資料格式</h4>
+                            <p class="text-sm text-gray-300">JSON</p>
+                        </div>
+                    </div>
+                    
+                    <div class="card p-4 rounded-lg flex items-center">
+                        <div class="w-12 h-12 rounded-lg bg-[#00e5ff] bg-opacity-20 flex items-center justify-center mr-4">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#00e5ff]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h4 class="font-medium text-white">圖像製作</h4>
+                            <p class="text-sm text-gray-300">Adobe Photoshop</p>
+                        </div>
+                    </div>
+                    
+                    <div class="card p-4 rounded-lg flex items-center">
+                        <div class="w-12 h-12 rounded-lg bg-[#8a4fff] bg-opacity-20 flex items-center justify-center mr-4">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#8a4fff]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h4 class="font-medium text-white">影片剪輯</h4>
+                            <p class="text-sm text-gray-300">Adobe Premiere Pro、剪映 Pro</p>
+                        </div>
+                    </div>
+                    
+                    <div class="card p-4 rounded-lg flex items-center">
+                        <div class="w-12 h-12 rounded-lg bg-[#ff6b9d] bg-opacity-20 flex items-center justify-center mr-4">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#ff6b9d]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h4 class="font-medium text-white">程式語言</h4>
+                            <p class="text-sm text-gray-300">C#</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 代碼示例 -->
+            <div class="mt-16">
+                <h3 class="text-xl font-semibold mb-6 text-center gradient-text">JSON 劇情配置示例</h3>
+                <div class="code-block p-4 rounded-lg overflow-x-auto">
+                    <pre class="text-gray-300 text-sm"><code>{
+  "dialogues": [
+    {
+      "type": "dialogue",
+      "character": "主角",
+      "portrait": "main_normal",
+      "position": "left",
+      "text": "這是一段對話示例，展示系統的基本功能。",
+      "background": "classroom"
+    },
+    {
+      "type": "aside",
+      "text": "這是旁白文字，用於描述場景或角色內心活動。"
+    },
+    {
+      "type": "dialogue",
+      "character": "NPC",
+      "portrait": "npc_smile",
+      "position": "right",
+      "text": "你可以透過選項來決定劇情走向。"
+    },
+    {
+      "type": "choice",
+      "options": [
+        {
+          "text": "選項一",
+          "nextIndex": 4
+        },
+        {
+          "text": "選項二",
+          "nextIndex": 5
+        }
+      ]
+    },
+    {
+      "type": "prop",
+      "propId": "key_item",
+      "text": "獲得了一把鑰匙！"
+    }
+  ]
+}</code></pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 專題成果總結 -->
+    <section id="result" class="py-20">
+        <div class="container mx-auto px-4">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl font-bold mb-2 serif">專題成果總結</h2>
+                <div class="h-1 w-16 bg-gradient-to-r from-[#8a4fff] to-[#ff6b9d] mx-auto"></div>
+            </div>
+            
+            <div class="bg-[#1a1a2e] p-8 rounded-lg shadow-lg">
+                <div class="flex flex-col md:flex-row">
+                    <div class="md:w-1/2 md:pr-8 mb-6 md:mb-0">
+                        <p class="text-gray-300 leading-relaxed">
+                            本專題成功建構出一套模組化的 2D 劇情對話系統，已實現角色對話、旁白展示、選項跳轉、道具呈現與黑幕轉場等核心功能，支援使用 JSON 控制劇情流程，具備良好的彈性與可擴充性。系統整體結構清晰，UI 元件與邏輯分離，能獨立管理並重複利用各種功能模組。
+                        </p>
+                        <p class="text-gray-300 leading-relaxed mt-4">
+                            在開發過程中，針對立繪與背景切換、打字動畫與過場時序等常見問題進行除錯與優化，並整合多種工具輔助素材製作，如 Photoshop、剪映 Pro 等。雖未完成完整遊戲內容，但系統已達穩定運作階段，可作為後續敘事型遊戲開發之基礎架構。
+                        </p>
+                    </div>
+                    <div class="md:w-1/2">
+                        <!-- 系統功能展示圖（自訂截圖） -->
+                        <div class="bg-[#151525] p-4 rounded-lg">
+                            <img src="dialogue.png" alt="對話系統實際畫面" class="rounded-lg w-full shadow-lg">
+                            <p class="text-center text-xs text-gray-400 mt-2">實際系統截圖</p>
+                        </div>
+
+                        
+                        <!-- 功能列表 -->
+                        <div class="mt-4 grid grid-cols-2 gap-2">
+                            <div class="bg-[#151525] p-3 rounded-lg">
+                                <div class="flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#00e5ff] mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    <span class="text-xs">角色對話</span>
+                                </div>
+                            </div>
+                            <div class="bg-[#151525] p-3 rounded-lg">
+                                <div class="flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#00e5ff] mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    <span class="text-xs">旁白展示</span>
+                                </div>
+                            </div>
+                            <div class="bg-[#151525] p-3 rounded-lg">
+                                <div class="flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#00e5ff] mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    <span class="text-xs">選項跳轉</span>
+                                </div>
+                            </div>
+                            <div class="bg-[#151525] p-3 rounded-lg">
+                                <div class="flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#00e5ff] mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    <span class="text-xs">道具呈現</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 結論與未來展望 -->
+    <section id="conclusion" class="py-20 bg-[#151525]">
+        <div class="container mx-auto px-4">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl font-bold mb-2 serif">結論與未來展望</h2>
+                <div class="h-1 w-16 bg-gradient-to-r from-[#8a4fff] to-[#ff6b9d] mx-auto"></div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="card p-6 rounded-lg">
+                    <div class="flex items-center mb-4">
+                        <div class="w-10 h-10 rounded-full bg-[#8a4fff] flex items-center justify-center mr-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold gradient-text">目前完成的部分</h3>
+                    </div>
+                    <p class="text-gray-300 leading-relaxed">
+                        本專題已成功完成對話系統之主要功能模組，包括對話與旁白顯示、角色立繪控制、黑幕轉場、選項跳轉、道具展示等。系統以 JSON 為資料來源，並建構了模組化的 UI 控制邏輯與獨立腳本架構。
+                    </p>
+                    <p class="text-gray-300 leading-relaxed mt-4">
+                        除基礎功能外，亦完成 SplashScene、LoadingScene 與 DialogueScene 的整合流程，具備一套初步可執行的劇情體驗流程。
+                    </p>
+                </div>
+                
+                <div class="card p-6 rounded-lg">
+                    <div class="flex items-center mb-4">
+                        <div class="w-10 h-10 rounded-full bg-[#ff6b9d] flex items-center justify-center mr-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold gradient-text">遇到的挑戰與解決方案</h3>
+                    </div>
+                    <p class="text-gray-300 leading-relaxed">
+                        在實作過程中，曾遭遇立繪無法正確顯示、動畫重複觸發、背景切換錯誤、黑幕與文字動畫時序不同步等問題。透過錯誤定位與模組重構，逐步調整加載順序與邏輯判斷，並加入回調機制確保動作同步完成。
+                    </p>
+                    <p class="text-gray-300 leading-relaxed mt-4">
+                        此外，LoadingScene 中影片與進度條爭用資源的問題，亦透過腳本整合解決。
+                    </p>
+                </div>
+                
+                <div class="card p-6 rounded-lg">
+                    <div class="flex items-center mb-4">
+                        <div class="w-10 h-10 rounded-full bg-[#00e5ff] flex items-center justify-center mr-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold gradient-text">未來的改進方向</h3>
+                    </div>
+                    <ul class="space-y-3 text-gray-300">
+                        <li class="flex items-start">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#00e5ff] mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span>強化 UI 與立繪美術表現，如美術風格統一與字體配置優化</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#00e5ff] mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span>增加劇情中動畫與音效觸發，提升敘事臨場感</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#00e5ff] mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span>簡化部分控制腳本結構，優化命名與模組拆分</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#00e5ff] mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span>擴充支線跳轉與條件分支邏輯，支援更複雜的互動設計</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#00e5ff] mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span>發展為完整敘事遊戲框架，整合角色互動、道具收集與關卡邏輯等功能</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="mt-12 text-center">
+                <p class="text-gray-300 max-w-2xl mx-auto">
+                    透過本專題的實作，奠定了互動式敘事系統的核心架構，並為日後更完整的遊戲製作打下堅實基礎。
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- 關於我 -->
+    <section id="about" class="py-20">
+        <div class="container mx-auto px-4">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl font-bold mb-2 serif">關於我</h2>
+                <div class="h-1 w-16 bg-gradient-to-r from-[#8a4fff] to-[#ff6b9d] mx-auto"></div>
+            </div>
+            
+            <div class="max-w-2xl mx-auto">
+                <div class="bg-[#1a1a2e] p-8 rounded-lg shadow-lg flex flex-col md:flex-row items-center">
+                    <div class="md:w-1/3 mb-6 md:mb-0 flex justify-center">
+                        <div class="w-32 h-32 rounded-full bg-gradient-to-r from-[#8a4fff] to-[#ff6b9d] p-1">
+                            <div class="w-full h-full rounded-full bg-[#1a1a2e] flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="md:w-2/3 md:pl-8">
+                        <h3 class="text-xl font-semibold mb-4 gradient-text">陳文茜</h3>
+                        <p class="text-gray-300 mb-4">
+                            國立金門大學資訊工程學系四年級學生，專注於遊戲開發與互動敘事設計。對小說創作與互動式敘事有濃厚興趣，致力於將故事轉化為可玩內容。
+                        </p>
+                        <div class="flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#00e5ff] mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                            <span class="text-gray-300">a0968189382@gmail.com</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 頁腳 -->
+    <footer class="py-8 bg-[#0f0f1a] text-center">
+        <div class="container mx-auto px-4">
+            <p class="text-gray-400 text-sm">
+                © 2024 陳文茜 - 國立金門大學資訊工程學系
+            </p>
+            <p class="text-gray-500 text-xs mt-2">
+                2D游戏剧情对话系统设计与实作 - 專題研究
+            </p>
+        </div>
+    </footer>
+
+    <!-- 回到頂部按鈕 -->
+    <button id="backToTop" class="fixed bottom-6 right-6 w-12 h-12 rounded-full bg-gradient-to-r from-[#8a4fff] to-[#ff6b9d] flex items-center justify-center shadow-lg opacity-0 transition-opacity duration-300">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+        </svg>
+    </button>
+
+    <script>
+        // 平滑滾動
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                
+                const targetId = this.getAttribute('href');
+                const targetElement = document.querySelector(targetId);
+                
+                if (targetElement) {
+                    window.scrollTo({
+                        top: targetElement.offsetTop - 70,
+                        behavior: 'smooth'
+                    });
+                }
+            });
+        });
+        
+        // 回到頂部按鈕
+        const backToTopButton = document.getElementById('backToTop');
+        
+        window.addEventListener('scroll', () => {
+            if (window.pageYOffset > 300) {
+                backToTopButton.style.opacity = '1';
+            } else {
+                backToTopButton.style.opacity = '0';
+            }
+        });
+        
+        backToTopButton.addEventListener('click', () => {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        });
+        
+        // 移動裝置選單
+        const mobileMenuButton = document.querySelector('.md\\:hidden');
+        const mobileMenu = document.createElement('div');
+        mobileMenu.className = 'fixed inset-0 bg-[#1a1a2e] bg-opacity-95 z-50 flex flex-col items-center justify-center transform transition-transform duration-300 translate-x-full';
+        document.body.appendChild(mobileMenu);
+        
+        const menuItems = document.querySelectorAll('.md\\:flex a');
+        menuItems.forEach(item => {
+            const clone = item.cloneNode(true);
+            clone.className = 'text-xl py-4';
+            mobileMenu.appendChild(clone);
+            
+            clone.addEventListener('click', () => {
+                mobileMenu.classList.add('translate-x-full');
+            });
+        });
+        
+        const closeButton = document.createElement('button');
+        closeButton.className = 'absolute top-6 right-6 text-white';
+        closeButton.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        `;
+        mobileMenu.appendChild(closeButton);
+        
+        mobileMenuButton.addEventListener('click', () => {
+            mobileMenu.classList.remove('translate-x-full');
+        });
+        
+        closeButton.addEventListener('click', () => {
+            mobileMenu.classList.add('translate-x-full');
+        });
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'94a9f0dae12ccb91',t:'MTc0OTA2NjQzMy4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
